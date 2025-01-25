@@ -159,7 +159,7 @@ class MBRParser:
         for i, entry in enumerate(self.partition_entries, 1):
             table_data.append([
                 f"{i} (0x{self.get_partition_offset(i):03X})",
-                f"0x{entry.boot_indicator:02X}" + (" (System, Boot)" if entry.boot_indicator == 0x80 else " (Default)"),
+                f"0x{entry.boot_indicator:02X}" + (" (System, Boot)" if entry.boot_indicator == 0x80 else " (Default)" if entry.boot_indicator == 0x00 else " (Invalid!!! Investigate!)"),
                 f"0x{entry.partition_type:02X} ({self.get_partition_type_desc(entry.partition_type)})",
                 f"({entry.starting_chs[0]}, {entry.starting_chs[1]}, {entry.starting_chs[2]})",
                 f"({entry.ending_chs[0]}, {entry.ending_chs[1]}, {entry.ending_chs[2]})",
