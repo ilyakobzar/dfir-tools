@@ -34,19 +34,18 @@ class MBRParser:
         self.mbr_hash = None
         self.entropy = None
         self.partition_types = {
-            0x00: "Empty", 0x01: "FAT12", 0x04: "FAT16 (<32MB)", 0x05: "Extended",
-            0x06: "FAT16B", 0x07: "NTFS/exFAT/HPFS", 0x0B: "FAT32 (CHS)",
-            0x0C: "FAT32 (LBA)", 0x0E: "FAT16B (LBA)", 0x0F: "Extended (LBA)",
-            0x11: "Hidden FAT12", 0x14: "Hidden FAT16 (<32MB)", 0x16: "Hidden FAT16",
-            0x17: "Hidden NTFS", 0x1B: "Hidden FAT32", 0x1C: "Hidden FAT32 (LBA)",
-            0x1E: "Hidden FAT16 (LBA)", 0x27: "Windows RE", 0x42: "Windows LDM",
-            0x80: "Old MINIX", 0x81: "MINIX/old Linux", 0x82: "Linux swap",
-            0x83: "Linux", 0x84: "OS/2 hidden", 0x85: "Linux extended",
-            0x86: "NTFS volume set", 0x87: "NTFS volume set", 0x8E: "Linux LVM",
-            0xA5: "FreeBSD", 0xA6: "OpenBSD", 0xA8: "Mac OSX", 0xA9: "NetBSD",
-            0xAB: "Mac OSX Boot", 0xAF: "Mac OSX HFS/HFS+", 0xBE: "Solaris boot",
-            0xBF: "Solaris", 0xEB: "BeOS BFS", 0xEE: "GPT Protective MBR",
-            0xEF: "EFI System Partition", 0xFB: "VMware VMFS", 0xFC: "VMware swap"
+            0x00: "Empty", 0x01: "FAT12,CHS", 0x04: "FAT16 (16-32MB), CHS", 0x05: "Microsoft Extended, CHS",
+            0x06: "FAT16 (32MB-2GB), CHS", 0x07: "NTFS", 0x0B: "FAT32, CHS", 0x0C: "FAT32, LBA",
+            0x0E: "FAT16 (32MB-2GB), LBA", 0x0F: "Microsoft Extended, LBA", 0x11: "Hidden FAT12, CHS", 
+            0x14: "Hidden FAT16 (16-32MB), CHS", 0x16: "Hidden FAT16 (32MB-2GB), CHS",
+            0x17: "Hidden NTFS", 0x1B: "Hidden FAT32, CHS", 0x1C: "Hidden FAT32, LBA",
+            0x1E: "Hidden FAT16 (32MB-2GB), LBA", 0x27: "Windows Recovery Environment", 
+            0x42: "Microsoft Dynamic Disk", 0x82: "Linux Swap", 0x83: "Linux", 
+            0x84: "Hibernation", 0x85: "Linux extended", 0x86: "NTFS Volume Set", 
+            0x87: "NTFS Volume Set", 0x8E: "Linux LVM", 0xA5: "FreeBSD", 0xA6: "OpenBSD", 0xA8: "Mac OSX",
+            0xA9: "NetBSD", 0xAB: "Mac OSX Boot", 0xAF: "Mac OSX HFS/HFS+", 0xB7: "BSDI", 0xB8: "BSDI swap",
+            0xBE: "Solaris boot", 0xBF: "Solaris", 0xEB: "BeOS, Haiku", 0xEE: "EFI GPT Disk",
+            0xEF: "EFI System Partition", 0xFB: "VMware File System", 0xFC: "VMware swap" 
         }
 
     def calculate_entropy(self, data: bytes) -> float:
