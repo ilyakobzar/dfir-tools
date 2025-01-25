@@ -1,9 +1,8 @@
 '''
 POC code for MBR analysis designed to:
 - Export MBR to mbr.bin file
-- Extract and validates MBR metadata including partition tables
+- Extract MBR metadata including partition tables
 - Calculate SHA256 hashes for MBR and bootstrap code
-- Identify partition types
 - Disassemble x86 16-bit bootstrap code
 '''
 
@@ -80,7 +79,7 @@ class MBRParser:
         """Parse a 16-byte partition entry."""
         boot_indicator = data[0]
         starting_chs = self.read_chs(data[1:4])
-        partition_type = data[4]
+        partition_type = data[4]  # Volume type
         ending_chs = self.read_chs(data[5:8])
         starting_lba = struct.unpack("<I", data[8:12])[0]
         size_in_sectors = struct.unpack("<I", data[12:16])[0]
@@ -99,7 +98,7 @@ class MBRParser:
         return hashlib.sha256(data).hexdigest()
 
     def parse(self):
-        """Parse the MBR from the disk image."""
+        """Parse the MBR from the disk."""
         try:
             with open(self.filename, 'rb') as f:
                 self.mbr_data = f.read(512)
@@ -147,7 +146,7 @@ class MBRParser:
         """Generate partition table data for tabulate."""
         headers = [
             "Partition",
-            "Bootable\n(+0x00)",
+            "Boot flag\n(+0x00)",
             "Type\n(+0x04)",
             "Starting CHS*\n(+0x01)",
             "Ending CHS*\n(+0x05)", 
@@ -160,7 +159,7 @@ class MBRParser:
         for i, entry in enumerate(self.partition_entries, 1):
             table_data.append([
                 f"{i} (0x{self.get_partition_offset(i):03X})",
-                f"0x{entry.boot_indicator:02X}" + (" (Active)" if entry.boot_indicator == 0x80 else ""),
+                f"0x{entry.boot_indicator:02X}" + (" (System, Boot)" if entry.boot_indicator == 0x80 else " (Default)"),
                 f"0x{entry.partition_type:02X} ({self.get_partition_type_desc(entry.partition_type)})",
                 f"({entry.starting_chs[0]}, {entry.starting_chs[1]}, {entry.starting_chs[2]})",
                 f"({entry.ending_chs[0]}, {entry.ending_chs[1]}, {entry.ending_chs[2]})",
@@ -185,18 +184,50 @@ class MBRParser:
         # Create Capstone instance for 16-bit x86 mode (real mode)
         md = Cs(CS_ARCH_X86, CS_MODE_16)
         
-        print("\nBootstrap Code Disassembly:")
+        '''print("\nBootstrap Code Disassembly:")
         print("=" * 30)
         
         # Disassemble bootstrap code
         for i, insn in enumerate(md.disasm(self.bootstrap_code, 0x7C00)):
-            print(f"0x{insn.address:04x}:\t{insn.mnemonic}\t{insn.op_str}")
+            print(f"0x{insn.address:04x}:\t{insn.mnemonic}\t{insn.op_str}")'''
         
         print("\nNote: Disassembly assumes 16-bit real mode addressing used in early boot process.")
 
     def analyze_bootstrap_code(self) -> Dict[str, Any]:
-        """Perform minimal analysis of bootstrap code."""
-        return {}
+        """Analyze bootstrap code and add comments on common parts."""
+        common_patterns = {
+            "xor\tax, ax": "Zero out AX register",
+            "mov\tss, ax": "Set Stack Segment to 0",
+            "mov\tsp, 0x7c00": "Set Stack Pointer to 0x7C00 (standard MBR load address)",
+            "mov\tsi, sp": "Set Source Index to Stack Pointer",
+            "mov\tes, ax": "Set Extra Segment to 0",
+            "mov\tds, ax": "Set Data Segment to 0",
+            "sti": "Enable interrupts",
+            "cld": "Clear direction flag (forward string operations)",
+            "int\t0x13": "BIOS Disk Service interrupt",
+            "int\t0x10": "BIOS Video Service interrupt",
+            "jmp\t0x0000:0x7c00": "Far jump to reset CS:IP to 0x0000:0x7C00",
+        }
+        
+        md = Cs(CS_ARCH_X86, CS_MODE_16)
+        commented_code = []
+        analysis_results = {
+            "common_patterns_found": [],
+        }
+        
+        for instruction in md.disasm(self.bootstrap_code, 0x7C00):
+            commented_instruction = f"0x{instruction.address:04x}:\t{instruction.mnemonic}\t{instruction.op_str}"
+            
+            for pattern, comment in common_patterns.items():
+                if pattern in commented_instruction:
+                    commented_instruction += f"\t\t\t\t; {comment}"
+                    analysis_results["common_patterns_found"].append(pattern)
+                    break
+            
+            commented_code.append(commented_instruction)
+        
+        analysis_results["commented_code"] = commented_code
+        return analysis_results
 
     def print_info(self):
         """Print parsed MBR information using tabulate."""
@@ -219,6 +250,7 @@ class MBRParser:
         ]
         print("\nBootstrap Code Metadata [0x000-0x1BD]:")
         print(tabulate(bootstrap_info, tablefmt="grid"))
+
 
         # Partition table
         headers, table_data = self.get_partition_table()
@@ -251,6 +283,13 @@ class MBRParser:
         ]
         print("\nBoot Signature [0x1FE-0x1FF]:")
         print(tabulate(signature_info, tablefmt="grid"))
+        
+        # Bootstrap code analysis
+        bootstrap_analysis = self.analyze_bootstrap_code()
+        print("\nCommented Bootstrap Code:")
+        for line in bootstrap_analysis["commented_code"]:
+            print(line)
+
 
 def export_report(parser, report_filename='mbr_report.txt'):
     """Export the MBR analysis report to a text file."""
