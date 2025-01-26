@@ -1,5 +1,5 @@
 '''
-POC code for MBR analysis designed to:
+MBR extraction and analysis tool designed to:
 - Export MBR to mbr.bin file
 - Extract MBR metadata including partition tables
 - Calculate SHA256 hashes for MBR and bootstrap code
@@ -148,8 +148,8 @@ class MBRParser:
             "Boot flag\n(+0x00)",
             "Type\n(+0x04)",
             "Starting CHS*\n(+0x01)",
-            "Ending CHS*\n(+0x05)", 
-            "Starting LBA**\n(+0x08)",
+            "Ending CHS\n(+0x05)", 
+            "Starting LBA\n(+0x08)",
             "Size (sectors)\n(+0x0C)",
             "Size (MB)"
         ]
@@ -158,7 +158,7 @@ class MBRParser:
         for i, entry in enumerate(self.partition_entries, 1):
             table_data.append([
                 f"{i} (0x{self.get_partition_offset(i):03X})",
-                f"0x{entry.boot_indicator:02X}" + (" (System, Boot)" if entry.boot_indicator == 0x80 else " (Default)" if entry.boot_indicator == 0x00 else " (Invalid!!! Investigate!)"),
+                f"0x{entry.boot_indicator:02X}" + (" (System, Boot)" if entry.boot_indicator == 0x80 else " (Default)" if entry.boot_indicator == 0x00 else " (Invalid!!!)"),
                 f"0x{entry.partition_type:02X} ({self.get_partition_type_desc(entry.partition_type)})",
                 f"({entry.starting_chs[0]}, {entry.starting_chs[1]}, {entry.starting_chs[2]})",
                 f"({entry.ending_chs[0]}, {entry.ending_chs[1]}, {entry.ending_chs[2]})",
@@ -183,24 +183,17 @@ class MBRParser:
         # Create Capstone instance for 16-bit x86 mode (real mode)
         md = Cs(CS_ARCH_X86, CS_MODE_16)
         
-        '''print("\nBootstrap Code Disassembly:")
-        print("=" * 30)
-        
-        # Disassemble bootstrap code
-        for i, insn in enumerate(md.disasm(self.bootstrap_code, 0x7C00)):
-            print(f"0x{insn.address:04x}:\t{insn.mnemonic}\t{insn.op_str}")'''
-        
         print("\nNote: Disassembly assumes 16-bit real mode addressing used in early boot process.")
 
     def analyze_bootstrap_code(self) -> Dict[str, Any]:
         """Analyze bootstrap code and add comments on common parts."""
         common_patterns = {
             "xor\tax, ax": "Zero out AX register",
-            "mov\tss, ax": "Set Stack Segment to 0",
-            "mov\tsp, 0x7c00": "Set Stack Pointer to 0x7C00 (standard MBR load address)",
-            "mov\tsi, sp": "Set Source Index to Stack Pointer",
-            "mov\tes, ax": "Set Extra Segment to 0",
-            "mov\tds, ax": "Set Data Segment to 0",
+            "mov\tss, ax": "Set stack segment to 0",
+            "mov\tsp, 0x7c00": "Set stack pointer to 0x7C00 (standard MBR load address)",
+            "mov\tsi, sp": "Set source index to stack pointer",
+            "mov\tes, ax": "Set extra segment to 0",
+            "mov\tds, ax": "Set data segment to 0",
             "sti": "Enable interrupts",
             "cld": "Clear direction flag (forward string operations)",
             "int\t0x13": "BIOS Disk Service interrupt",
@@ -233,12 +226,12 @@ class MBRParser:
         
         # MBR Hash and basic info
         mbr_info = [
-            ["File", self.filename],
+            ["Disk / Image", self.filename],
             ["SHA256", self.mbr_hash],
             ["Size", "512 bytes (0x000-0x1FF)"],
             ["Entropy", f"{self.entropy:.4f}"]
         ]
-        print("\nMBR Overview [0x000-0x1FF]:")
+        print("\nMBR overview [0x000-0x1FF]:")
         print(tabulate(mbr_info, tablefmt="grid"))
         
         # Bootstrap code information
@@ -247,45 +240,33 @@ class MBRParser:
             ["First 16 bytes (hex)", self.bootstrap_code[:16].hex()],
             ["SHA256", self.calculate_hash(self.bootstrap_code)]
         ]
-        print("\nBootstrap Code Metadata [0x000-0x1BD]:")
+        print("\nBootstrap code section [0x000-0x1BD]:")
         print(tabulate(bootstrap_info, tablefmt="grid"))
 
 
         # Partition table
         headers, table_data = self.get_partition_table()
-        print("\nPartition Table [0x1BE-0x1FD]:")
+        print("\nPartition tables [0x1BE-0x1FD]:")
         print(tabulate(table_data, headers=headers, tablefmt="grid"))
 
         # Partition Analysis
         active_partitions = [
             entry for entry in self.partition_entries 
             if entry.boot_indicator == 0x80
-        ]
-                # Addressing Mode Explanation
-        print("\n*CHS (Cylinder-Head-Sector):")
-        print("  - Cylinder: Represents concentric circles on the disk")
-        print("  - Head: Represents the read/write head position")
-        print("  - Sector: Represents the specific sector within a track")
-        print("**LBA (Logical Block Addressing):")
-        print("  - Starting LBA indicates the first logical sector of the partition")
-        
-        print("\nPartition Analysis:")
-        print(f"Total Partitions: {len(self.partition_entries)}")
-        print(f"Active Partitions: {len(active_partitions)}")
-       
+        ]      
         
         # Boot Signature
         signature_info = [
-            ["Boot Signature (hex)", self.boot_signature.hex()],
+            ["Boot signature (hex)", self.boot_signature.hex()],
             ["Valid", "Yes" if self.boot_signature == b'\x55\xAA' else "No"],
-            ["Byte Interpretation", "Standard MBR Signature" if self.boot_signature == b'\x55\xAA' else "Nonstandard Signature"]
+            ["Byte interpretation", "Standard MBR signature" if self.boot_signature == b'\x55\xAA' else "Nonstandard signature"]
         ]
-        print("\nBoot Signature [0x1FE-0x1FF]:")
+        print("\nBoot signature [0x1FE-0x1FF]:")
         print(tabulate(signature_info, tablefmt="grid"))
         
         # Bootstrap code analysis
         bootstrap_analysis = self.analyze_bootstrap_code()
-        print("\nCommented Bootstrap Code:")
+        print("\nDisassembled bootstrap code with comments:")
         for line in bootstrap_analysis["commented_code"]:
             print(line)
 
